@@ -1,5 +1,5 @@
 import type { RawItem } from '../types';
-import { getTextViaFetch, getTextViaNode } from './http';
+import { getTextViaNode } from './http';
 
 /**
  * GDELT indexes news from every country in 100+ languages and updates every
@@ -76,16 +76,16 @@ export async function fetchGdelt(
   q: GdeltQuery,
   options: { maxRecords?: number; timespan?: string; timeoutMs?: number; attempts?: number } = {},
 ): Promise<RawItem[]> {
-  const { attempts = 3 } = options;
+  const { attempts = 2 } = options;
   let lastError: unknown;
 
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {
-      return await fetchGdeltOnce(q, { ...options, transport: attempt % 2 === 0 ? 'fetch' : 'node' });
+      return await fetchGdeltOnce(q, options);
     } catch (error) {
       lastError = error;
       if (attempt < attempts - 1) {
-        await new Promise((resolve) => setTimeout(resolve, 1200));
+        await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     }
   }
@@ -98,9 +98,8 @@ async function fetchGdeltOnce(
   {
     maxRecords = 30,
     timespan = '3d',
-    timeoutMs = 42_000,
-    transport = 'fetch',
-  }: { maxRecords?: number; timespan?: string; timeoutMs?: number; transport?: 'fetch' | 'node' } = {},
+    timeoutMs = 65_000,
+  }: { maxRecords?: number; timespan?: string; timeoutMs?: number } = {},
 ): Promise<RawItem[]> {
   const url = new URL(ENDPOINT);
   url.searchParams.set('query', `${q.query} sourcelang:english`);
@@ -111,11 +110,10 @@ async function fetchGdeltOnce(
   url.searchParams.set('sort', 'DateDesc');
 
   const headers = { 'user-agent': USER_AGENT, accept: '*/*' };
-  const get = transport === 'node' ? getTextViaNode : getTextViaFetch;
-  const { status, body } = await get(url.toString(), headers, timeoutMs);
+  const { status, body } = await getTextViaNode(url.toString(), headers, timeoutMs);
 
   if (status < 200 || status >= 300) {
-    throw new Error(`GDELT ${q.label} answered ${status} over ${transport}`);
+    throw new Error(`GDELT ${q.label} answered ${status}`);
   }
 
   // GDELT answers an over-rate-limited or malformed query with plain text,
