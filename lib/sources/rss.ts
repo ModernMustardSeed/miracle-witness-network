@@ -3,7 +3,10 @@ import type { RawItem } from '../types';
 export interface FeedDef {
   name: string;
   url: string;
-  /** Feeds whose whole output is already good news skip the positive-signal gate. */
+  /**
+   * A wire whose whole output is good news. It earns a confidence and weight
+   * boost, never a bypass of the signal gate: mostly good news is not all of it.
+   */
   alwaysPositive?: boolean;
   country?: string;
 }
@@ -82,6 +85,23 @@ export function textOf(html: string): string {
     .trim();
 }
 
+/**
+ * Publishers append their own furniture to a feed summary. WordPress adds
+ * "The post X appeared first on Y", several outlets lead with a shouted byline,
+ * and plenty end with "Continue reading". None of it is the story, and all of
+ * it was showing up in our standfirsts.
+ */
+export function cleanSummary(text: string): string {
+  return text
+    .replace(/\bThe post\b[\s\S]*?\bappeared first on\b[^.]*\.?/gi, '')
+    .replace(/^\s*BY\s+[A-Z][A-Z\s.'-]{3,60}?(?=[A-Z][a-z])/, '')
+    .replace(/^\s*By\s+[^,.]{2,50}[,.]\s*/, '')
+    .replace(/\b(Continue reading|Read more|Read the full story)\b.*$/i, '')
+    .replace(/\[[……]\]\s*$/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function tag(block: string, name: string): string | null {
   const re = new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${name}>`, 'i');
   const m = re.exec(block);
@@ -150,7 +170,7 @@ export function parseFeed(xml: string, feed: FeedDef): RawItem[] {
 
     const body =
       tag(block, 'content:encoded') ?? tag(block, 'description') ?? tag(block, 'summary');
-    const summary = body ? textOf(body).slice(0, 600) : null;
+    const summary = body ? cleanSummary(textOf(body)).slice(0, 600) : null;
 
     items.push({
       title,

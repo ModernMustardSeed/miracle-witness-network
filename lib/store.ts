@@ -404,9 +404,11 @@ const LEAD_BIAS: Record<DeskId, number> = {
   revival: 22,
   reunion: 18,
   justice: 14,
+  courage: 12,
   kindness: 8,
   provision: 6,
   healing: 2,
+  discovery: 1,
   renewal: 0,
 };
 
@@ -434,7 +436,10 @@ export interface Edition {
   lead: Story | null;
   seconds: Story[];
   wire: Story[];
+  /** Every desk, in running order, including the ones that are quiet. */
   byDesk: Array<{ desk: DeskId; stories: Story[] }>;
+  /** How many stories are on each desk right now, for the INSIDE index. */
+  counts: Record<DeskId, number>;
   stats: NewsroomStats;
   persisted: boolean;
 }
@@ -452,13 +457,20 @@ export async function edition(): Promise<Edition> {
   const seconds = rest.slice(0, 3);
   const wire = rest.slice(3, 15);
 
+  // Every desk runs, quiet ones included. A section that disappears when it
+  // has nothing tells the reader it does not exist; a section that says it is
+  // quiet tells the reader the truth.
   const byDesk = DESK_IDS.map((id) => ({
     desk: id,
     stories: ordered
       .filter((story) => story.desk === id)
       .sort((a, b) => score(b) - score(a))
       .slice(0, 3),
-  })).filter((group) => group.stories.length > 0);
+  }));
 
-  return { lead, seconds, wire, byDesk, stats, persisted: active.kind === 'supabase' };
+  const counts = Object.fromEntries(
+    DESK_IDS.map((id) => [id, ordered.filter((story) => story.desk === id).length]),
+  ) as Record<DeskId, number>;
+
+  return { lead, seconds, wire, byDesk, counts, stats, persisted: active.kind === 'supabase' };
 }

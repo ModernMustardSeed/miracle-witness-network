@@ -32,6 +32,8 @@ const config: Config = {
           justice: '#3B4A8C',
           renewal: '#4A6A2B',
           underground: '#5A5140',
+          discovery: '#1F5F70',
+          courage: '#8A3B12',
         },
       },
       fontFamily: {

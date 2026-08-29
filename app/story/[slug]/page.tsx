@@ -106,7 +106,7 @@ export default async function StoryPage({ params }: StoryPageProps) {
                   fill
                   priority
                   sizes="(max-width: 1024px) 100vw, 62vw"
-                  className="object-cover"
+                  className="press-photo object-cover"
                 />
               </div>
               <figcaption className="mt-2 text-xs text-ink-faint">
