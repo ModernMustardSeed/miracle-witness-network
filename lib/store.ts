@@ -413,8 +413,15 @@ const LEAD_BIAS: Record<DeskId, number> = {
 export function pickLead(ordered: Story[]): Story | null {
   const pool = ordered.slice(0, 14);
   if (pool.length === 0) return null;
-  const illustrated = pool.filter((story) => story.imageUrl);
-  const candidates = illustrated.length > 0 ? illustrated : pool;
+
+  // A story the editor actually read outranks one the keyword pass waved
+  // through. This is what the front page looks like on a pass where the model
+  // could not be reached, so it has to hold up on its own.
+  const edited = pool.filter((story) => story.reviewedBy === 'claude');
+  const tier = edited.length > 0 ? edited : pool;
+
+  const illustrated = tier.filter((story) => story.imageUrl);
+  const candidates = illustrated.length > 0 ? illustrated : tier;
   return (
     [...candidates].sort(
       (a, b) => score(b) + LEAD_BIAS[b.desk] - (score(a) + LEAD_BIAS[a.desk]),

@@ -91,6 +91,54 @@ const VETO_PARDON = [
   'compensation awarded',
 ] as const;
 
+/**
+ * Things that are not news, whatever desk they look like.
+ *
+ * The four dedicated good-news wires skip the positive-signal gate, because
+ * their whole output is good news. That is what let a horoscope and a podcast
+ * transcript onto the front page the first time the editor was unreachable and
+ * the keyword pass ran the paper alone. The degraded mode has to be
+ * presentable, so shape is checked before anything else.
+ */
+const SHAPE_VETO = [
+  'horoscope',
+  'astrology',
+  'zodiac',
+  'podcast transcript',
+  'transcript:',
+  'good news in history',
+  'what went right',
+  'week in review',
+  'this week in',
+  'roundup',
+  'round-up',
+  'quiz',
+  'recipe',
+  'gift guide',
+  'best deals',
+  'sponsored',
+  'advertisement',
+  'giveaway',
+  'sweepstakes',
+  'opinion:',
+  'editorial:',
+  'letter to the editor',
+  'book review',
+  'obituary',
+  'obituaries',
+  'crossword',
+  'newsletter signup',
+] as const;
+
+/** "6 useful things to donate" and friends. A listicle is not a report. */
+const LISTICLE = /^\s*(\d{1,2}|top\s+\d{1,2}|the\s+\d{1,2}\s+best)\b/i;
+
+export function wrongShape(item: RawItem): boolean {
+  const title = item.title.toLowerCase();
+  if (LISTICLE.test(item.title)) return true;
+  return SHAPE_VETO.some((phrase) => title.includes(phrase));
+}
+
 type SignalTable = Record<DeskId, readonly string[]>;
 
 const SIGNALS: SignalTable = {
@@ -352,6 +400,7 @@ export interface Screened {
  * it is deliberately strict rather than generous.
  */
 export function screen(item: RawItem, alwaysPositive: boolean): Screened | null {
+  if (wrongShape(item)) return null;
   if (vetoed(item)) return null;
 
   const guess = guessDesk(item);
