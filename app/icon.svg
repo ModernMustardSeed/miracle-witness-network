@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Miracle Witness Network">
+  <rect width="64" height="64" rx="10" fill="#FBF7EF"/>
+  <circle cx="32" cy="38" r="15" fill="#B4471B"/>
+  <rect x="0" y="38" width="64" height="26" fill="#FBF7EF"/>
+  <rect x="8" y="37" width="48" height="3.5" rx="1.75" fill="#1B1815"/>
+  <rect x="8" y="45" width="34" height="2.5" rx="1.25" fill="#1B1815" opacity="0.55"/>
+  <rect x="8" y="51.5" width="42" height="2.5" rx="1.25" fill="#1B1815" opacity="0.35"/>
+</svg>
