@@ -10,8 +10,9 @@ export interface FeedDef {
 
 /**
  * Every feed here was probed for a 200 and a parseable `<item>` list before it
- * was added. `pnpm sources:check` re-probes them; a feed that stops answering
- * is dropped from a scan without taking the scan down.
+ * was added, and then again from a deployed function, because some publishers
+ * answer a laptop and 403 a datacentre. `pnpm sources:check` re-probes them; a
+ * feed that stops answering is dropped from a scan without taking it down.
  */
 export const FEEDS: FeedDef[] = [
   { name: 'Good News Network', url: 'https://www.goodnewsnetwork.org/feed/', alwaysPositive: true },
@@ -31,8 +32,6 @@ export const FEEDS: FeedDef[] = [
   { name: 'Open Doors', url: 'https://www.opendoorsuk.org/feed/' },
   { name: 'NPR Health', url: 'https://feeds.npr.org/1128/rss.xml' },
   { name: 'Christianity Today', url: 'https://www.christianitytoday.com/rss/' },
-  { name: 'Evangelical Focus', url: 'https://www.evangelicalfocus.com/rss' },
-  { name: 'Sight Magazine', url: 'https://sightmagazine.com.au/feed' },
   // The persecution desks. Most of what they publish is grief and the veto
   // stops it there, which is the point: what gets through is the church that
   // kept meeting anyway.
