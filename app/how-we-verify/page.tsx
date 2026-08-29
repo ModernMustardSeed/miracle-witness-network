@@ -107,9 +107,9 @@ export default async function HowWeVerifyPage() {
             The second lane is GDELT, the open index of world news that covers
             every country in more than a hundred languages and refreshes every
             fifteen minutes. We hold {GDELT_QUERIES.length} standing queries
-            against it and run five of them each hour on a rotation, two at a
-            time, because it is a free public service and it throttles anyone
-            who forgets that. This is the lane that reaches a flood rescue in
+            against it and run four of them each hour on a rotation, two at a
+            time, because it is a free public service and a healthy answer from
+            it takes the better part of a minute. This is the lane that reaches a flood rescue in
             Nepal or a building collapse in Abuja within the hour, which no
             curated good-news feed ever does.
           </p>

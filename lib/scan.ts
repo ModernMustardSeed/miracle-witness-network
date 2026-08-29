@@ -57,18 +57,34 @@ export function gdeltWindow(hour: number, size = 5): GdeltQuery[] {
   return Array.from({ length: Math.min(size, total) }, (_, i) => GDELT_QUERIES[(start + i) % total]!);
 }
 
+/**
+ * Runs work a few at a time, and stops handing out new work once the deadline
+ * passes. A healthy GDELT call takes 47 seconds, so without a ceiling this one
+ * lane could spend the whole function's budget and leave nothing for the
+ * editor. Whatever has not started by the deadline is reported as unanswered,
+ * which is true, and the next hour picks it up.
+ */
 async function pool<T, R>(
   items: T[],
   concurrency: number,
+  deadlineMs: number,
   work: (item: T) => Promise<R>,
 ): Promise<PromiseSettledResult<R>[]> {
   const results: PromiseSettledResult<R>[] = new Array(items.length);
+  const until = Date.now() + deadlineMs;
   let cursor = 0;
 
   const runners = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
     while (cursor < items.length) {
       const index = cursor++;
       const item = items[index]!;
+      if (Date.now() >= until) {
+        results[index] = {
+          status: 'rejected',
+          reason: new Error('the lane ran out of time this pass'),
+        };
+        continue;
+      }
       try {
         results[index] = { status: 'fulfilled', value: await work(item) };
       } catch (reason) {
@@ -100,7 +116,7 @@ async function collect(options: Required<ScanOptions>): Promise<Collected> {
   // at a time or it answers nothing.
   const [feedResults, gdeltResults] = await Promise.all([
     Promise.allSettled(FEEDS.map(async (feed) => fetchFeed(feed))),
-    pool(queries, 2, (query) => fetchGdelt(query, { timespan: options.gdeltTimespan })),
+    pool(queries, 2, 150_000, (query) => fetchGdelt(query, { timespan: options.gdeltTimespan })),
   ]);
   const settled = [...feedResults, ...gdeltResults];
   const items: RawItem[] = [];
@@ -172,7 +188,7 @@ export async function runScan(options: ScanOptions = {}): Promise<ScanResult> {
     // The read path dresses only what lands above the fold, because a reader is
     // waiting on it. The hourly cron has time to dress the whole edition.
     enrichImages: options.enrichImages ?? (options.includeGdelt ? 30 : 8),
-    gdeltQueries: options.gdeltQueries ?? 5,
+    gdeltQueries: options.gdeltQueries ?? 4,
     skipKnown: options.skipKnown ?? (async () => new Set<string>()),
   };
 
