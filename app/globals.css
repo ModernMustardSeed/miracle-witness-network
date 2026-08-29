@@ -1,0 +1,157 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --paper: #fbf7ef;
+    --paper-card: #fffdf9;
+    --paper-tint: #f3ecdf;
+    --ink: #1b1815;
+    --ink-soft: #5c554c;
+    --rule: #e4daca;
+    --ember: #b4471b;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+
+  body {
+    background-color: var(--paper);
+    color: var(--ink);
+    font-feature-settings: 'kern' 1, 'liga' 1;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: #f8dcc8;
+    color: var(--ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ember);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+}
+
+@layer components {
+  /* The grain that makes the page read as paper rather than as a white box.
+     One inline SVG, no request, three per cent opacity. */
+  .grain::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0.045;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  .kicker {
+    font-family: var(--font-sans), system-ui, sans-serif;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+
+  .rule-top {
+    border-top: 1px solid var(--rule);
+  }
+
+  /* A hairline above a heavier line, the way a broadsheet separates sections. */
+  .rule-double {
+    border-top: 3px solid var(--ink);
+    box-shadow: 0 3px 0 -2px var(--rule);
+  }
+
+  .dropcap::first-letter {
+    font-family: var(--font-display), Georgia, serif;
+    float: left;
+    font-size: 3.6em;
+    line-height: 0.82;
+    font-weight: 600;
+    padding-right: 0.08em;
+    padding-top: 0.06em;
+    color: var(--ember);
+  }
+
+  .link-underline {
+    background-image: linear-gradient(var(--rule), var(--rule));
+    background-position: 0 100%;
+    background-repeat: no-repeat;
+    background-size: 100% 1px;
+    transition: background-size 0.25s ease, color 0.25s ease;
+  }
+
+  .link-underline:hover {
+    background-image: linear-gradient(var(--ember), var(--ember));
+    background-size: 100% 2px;
+  }
+
+  .headline-link {
+    text-decoration-color: transparent;
+    text-underline-offset: 3px;
+    text-decoration-thickness: 1px;
+    transition: text-decoration-color 0.2s ease, color 0.2s ease;
+  }
+
+  .headline-link:hover {
+    text-decoration: underline;
+    text-decoration-color: var(--ember);
+    color: var(--ember);
+  }
+}
+
+@layer utilities {
+  .col-rule {
+    border-left: 1px solid var(--rule);
+  }
+
+  .text-balance-tight {
+    text-wrap: balance;
+  }
+}
+
+/* The Modern Mustard Seed credit. Scoped past any blanket footer link rule so
+   the mustard is the colour that actually computes, and carries its own
+   underline so it never depends on hue alone to read as a link. */
+.mwn-foot a.mms-credit {
+  color: #f5b700;
+  text-decoration: underline;
+  text-decoration-color: #f5b700;
+  text-underline-offset: 2px;
+}
+
+.mwn-foot a.mms-credit:hover,
+.mwn-foot a.mms-credit:focus-visible {
+  color: #ffd23f;
+  text-decoration-color: #ffd23f;
+}
