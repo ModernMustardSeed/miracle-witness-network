@@ -9,8 +9,9 @@ import type { RawItem } from './types';
  * 1. A headline whose subject is a death, a crime or a catastrophe never runs,
  *    even when a rescue is buried inside it. "Two rescued, twelve killed" is a
  *    disaster story. We report the rescue when an outlet leads with the rescue.
- * 2. Nothing runs on absence of evidence. An item must carry a positive signal
- *    of its own, unless it came from a wire whose entire output is good news.
+ * 2. Nothing runs on absence of evidence. Every item carries a positive signal
+ *    in its own headline, from every source, including the wires that publish
+ *    nothing but good news. Those get a confidence boost, never a free pass.
  */
 
 /** Kills an item outright. Ordered roughly by how often each one fires. */
@@ -70,6 +71,19 @@ const VETO = [
   'crackdown',
   'deport*',
   'evicted',
+  'casualties',
+  'casualty',
+  'catastrophic',
+  'sounds alarm',
+  'sounds the alarm',
+  'accuse*',
+  'condemn*',
+  'slams',
+  'backlash',
+  'funding cuts',
+  'budget cuts',
+  'shortage',
+  'outbreak',
 ] as const;
 
 /**
@@ -94,11 +108,11 @@ const VETO_PARDON = [
 /**
  * Things that are not news, whatever desk they look like.
  *
- * The four dedicated good-news wires skip the positive-signal gate, because
- * their whole output is good news. That is what let a horoscope and a podcast
- * transcript onto the front page the first time the editor was unreachable and
- * the keyword pass ran the paper alone. The degraded mode has to be
- * presentable, so shape is checked before anything else.
+ * A horoscope and a podcast transcript reached the front page the first time
+ * the editor was unreachable and the keyword pass ran the paper alone. Both
+ * came off a good-news wire and neither is a report about anything. Shape is
+ * checked before anything else, because the degraded mode still has to be
+ * something a reader would look at.
  */
 const SHAPE_VETO = [
   'horoscope',
@@ -203,7 +217,9 @@ const SIGNALS: SignalTable = {
     'breakthrough',
     'approved treatment',
     'trial success',
-    'vaccine',
+    'vaccinated',
+    'vaccine approved',
+    'vaccine rollout',
     'eradicated',
     'discharged from hospital',
     'clean bill of health',
@@ -325,8 +341,21 @@ export function normaliseTitle(title: string): string {
     .trim();
 }
 
+/** The veto reads everything, because rejecting generously is the safe error. */
 function haystack(item: RawItem): string {
   return `${item.title} ${item.summary ?? ''}`.toLowerCase();
+}
+
+/**
+ * The positive signal has to come from the headline.
+ *
+ * Reading it out of the article body made the gate meaningless: a long
+ * summary mentions 'donated' or 'volunteer' somewhere no matter what it is
+ * about, which is how a story about science funding cuts landed on the
+ * kindness desk. A story that is good news says so in its headline.
+ */
+function headline(item: RawItem): string {
+  return item.title.toLowerCase();
 }
 
 const escape = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -364,7 +393,7 @@ export interface DeskGuess {
 }
 
 export function guessDesk(item: RawItem): DeskGuess | null {
-  const text = haystack(item);
+  const text = headline(item);
   let best: DeskGuess | null = null;
 
   for (const [id, phrases] of Object.entries(SIGNALS) as Array<[DeskId, readonly string[]]>) {
@@ -399,21 +428,25 @@ export interface Screened {
  * it is also the whole classifier when no API key is configured, which is why
  * it is deliberately strict rather than generous.
  */
-export function screen(item: RawItem, alwaysPositive: boolean): Screened | null {
+export function screen(item: RawItem, trustedWire: boolean): Screened | null {
   if (wrongShape(item)) return null;
   if (vetoed(item)) return null;
 
+  // Every item earns its place, including items from the dedicated good-news
+  // wires. Letting those skip the gate was a shortcut that put a political
+  // story about funding cuts on the kindness desk the first time the editor
+  // was unreachable: their output is mostly good news, which is not the same
+  // as all of it. Publishing on a masthead rather than on the words is exactly
+  // the habit this newsroom exists to avoid.
   const guess = guessDesk(item);
-  if (!guess && !alwaysPositive) return null;
-
-  const desk: DeskId = guess?.desk ?? 'kindness';
-  const hits = guess?.hits ?? 1;
+  if (!guess) return null;
 
   return {
     item,
-    desk,
-    weight: baseWeight(item, hits),
-    confidence: guess ? Math.min(88, 52 + hits * 9) : 58,
-    locationSensitive: desk === 'underground',
+    desk: guess.desk,
+    // A wire that only prints good news is corroboration, not a free pass.
+    weight: Math.min(96, baseWeight(item, guess.hits) + (trustedWire ? 6 : 0)),
+    confidence: Math.min(90, 52 + guess.hits * 9 + (trustedWire ? 8 : 0)),
+    locationSensitive: guess.desk === 'underground',
   };
 }
