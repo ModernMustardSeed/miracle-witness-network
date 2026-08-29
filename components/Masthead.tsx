@@ -17,39 +17,52 @@ const NAV = [
 
 const subscribeToNothing = () => () => {};
 
-function EditionLine() {
-  // The server has no idea what day it is where the reader is, so the date is
-  // rendered only once the client is driving. useSyncExternalStore gives that
-  // answer during render, with no state written from inside an effect.
+/**
+ * The date and the edition number belong to the reader, not the server, so they
+ * render once the client is driving. useSyncExternalStore answers that during
+ * render, with no state written from inside an effect.
+ */
+function useClientDate(): Date | null {
   const onClient = useSyncExternalStore(
     subscribeToNothing,
     () => true,
     () => false,
   );
+  return onClient ? new Date() : null;
+}
 
-  const today = onClient
-    ? new Date().toLocaleDateString('en-US', {
-        weekday: 'long',
-        month: 'long',
-        day: 'numeric',
-        year: 'numeric',
-      })
-    : null;
-
-  return <span className="block min-h-[1rem] tabular-nums">{today ?? ' '}</span>;
+/** Papers number their editions from a founding date. Ours is 1 January 2026. */
+function editionNumber(date: Date): number {
+  const founded = Date.UTC(2026, 0, 1);
+  return Math.max(1, Math.floor((date.valueOf() - founded) / 86_400_000) + 1);
 }
 
 export function Masthead() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const today = useClientDate();
+
+  const dateLine = today
+    ? today
+        .toLocaleDateString('en-US', {
+          weekday: 'long',
+          month: 'long',
+          day: 'numeric',
+          year: 'numeric',
+        })
+        .toUpperCase()
+    : '';
 
   return (
     <header className="relative">
-      <div className="border-b border-rule bg-paper-tint/60">
-        <div className="mx-auto flex max-w-broadsheet items-center justify-between gap-4 px-4 py-2 text-[11px] uppercase tracking-[0.14em] text-ink-soft sm:px-6">
-          <EditionLine />
-          <span className="hidden sm:block">Good news, gathered every hour</span>
-          <span className="flex items-center gap-2">
+      {/* Folio strip: volume, date, motto. */}
+      <div className="border-b border-ink/25 bg-paper-tint">
+        <div className="mx-auto flex max-w-broadsheet items-center justify-between gap-3 px-4 py-1.5 sm:px-6">
+          <span className="folio hidden min-h-[0.9rem] tabular-nums sm:block">
+            {today ? `Vol. I · No. ${editionNumber(today)}` : ''}
+          </span>
+          <span className="folio min-h-[0.9rem] truncate text-center">{dateLine}</span>
+          <span className="folio flex items-center gap-2">
             <span
               aria-hidden
               className="inline-block h-1.5 w-1.5 rounded-full bg-desk-rescue animate-pulse-dot"
@@ -59,24 +72,43 @@ export function Masthead() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-broadsheet px-4 pb-3 pt-6 text-center sm:px-6 sm:pt-8">
-        <Link href="/" className="inline-block group">
-          <span className="kicker block text-ember">Miracle</span>
-          <span className="mt-1 block font-display text-[2.1rem] font-semibold leading-[0.95] tracking-[-0.02em] text-ink sm:text-[3.2rem] md:text-[3.9rem]">
+      {/* The nameplate. It takes the whole measure, margin to margin, the way
+          a broadsheet nameplate does. The ears sit under it rather than beside
+          it, because a masthead that shares its line is a logo, not a plate. */}
+      <div className="mx-auto max-w-broadsheet px-4 pb-3 pt-4 sm:px-6 sm:pt-6">
+        <h1>
+          <Link href="/" aria-label="Miracle Witness Network, front page" className="block">
+            <span className="nameplate text-ink">MIRACLE</span>
+          </Link>
+        </h1>
+
+        <div className="section-head mt-1 sm:mt-1.5">
+          <span className="index-entry whitespace-nowrap px-2 text-[0.6rem] tracking-[0.4em] text-ink sm:text-[0.82rem] sm:tracking-[0.58em]">
             Witness Network
           </span>
-        </Link>
-        <p className="mx-auto mt-3 max-w-xl text-[13px] leading-relaxed text-ink-soft">
-          Real stories. Named sources. Every one you can check.
-        </p>
+        </div>
+
+        <div className="mt-3 grid gap-2 lg:grid-cols-[13rem_1fr_13rem] lg:items-start lg:gap-6">
+          <p className="ear hidden lg:block">
+            Established 2026. Reporting the good from every country on earth,
+            every hour, with the outlet that broke it named.
+          </p>
+          <p className="text-center text-[11px] italic leading-relaxed text-ink-soft sm:text-[13px]">
+            Real stories. Named sources. Every one you can check.
+          </p>
+          <p className="ear hidden text-right lg:block">
+            No invented story. No counted witness. Every number on this page is
+            counted from the archive as it renders.
+          </p>
+        </div>
       </div>
 
       <nav
         aria-label="Sections"
-        className="sticky top-0 z-40 border-y border-ink/15 bg-paper/95 backdrop-blur supports-[backdrop-filter]:bg-paper/80"
+        className="sticky top-0 z-40 border-y-[3px] border-ink bg-paper/95 backdrop-blur supports-[backdrop-filter]:bg-paper/85"
       >
-        <div className="mx-auto flex max-w-broadsheet items-center justify-between px-4 sm:px-6">
-          <ul className="hidden flex-wrap items-center gap-x-7 gap-y-1 py-2.5 md:flex">
+        <div className="mx-auto flex max-w-broadsheet items-center justify-between px-4 sm:px-6 md:justify-center">
+          <ul className="hidden flex-wrap items-center justify-center gap-x-7 gap-y-1 py-2.5 md:flex">
             {NAV.map((entry) => {
               const active =
                 entry.href === '/' ? pathname === '/' : pathname.startsWith(entry.href);
@@ -85,7 +117,7 @@ export function Masthead() {
                   <Link
                     href={entry.href}
                     aria-current={active ? 'page' : undefined}
-                    className={`kicker transition-colors ${
+                    className={`index-entry transition-colors ${
                       active ? 'text-ember' : 'text-ink hover:text-ember'
                     }`}
                   >
@@ -108,15 +140,9 @@ export function Masthead() {
               <span className="block h-[2px] w-5 bg-ink" />
               <span className="block h-[2px] w-5 bg-ink" />
             </span>
-            <span className="kicker">{open ? 'Close' : 'Sections'}</span>
+            <span className="index-entry">{open ? 'Close' : 'Sections'}</span>
           </button>
 
-          <Link
-            href="/wire"
-            className="kicker hidden py-2.5 text-ink-soft transition-colors hover:text-ember md:block"
-          >
-            {DESK_LIST.length} desks
-          </Link>
         </div>
 
         {open && (
@@ -135,14 +161,14 @@ export function Masthead() {
               ))}
             </ul>
             <div className="mx-auto max-w-broadsheet px-4 pb-4">
-              <p className="kicker mb-2 text-ink-soft">Desks</p>
+              <p className="index-entry mb-2 text-ink-soft">The desks</p>
               <div className="flex flex-wrap gap-x-4 gap-y-2">
                 {DESK_LIST.map((entry) => (
                   <Link
                     key={entry.id}
                     href={`/desk/${entry.id}`}
                     onClick={() => setOpen(false)}
-                    className="text-sm text-ink-soft"
+                    className="text-sm font-semibold"
                     style={{ color: entry.color }}
                   >
                     {entry.name}

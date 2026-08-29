@@ -91,7 +91,7 @@ function Photo({
         sizes={sizes}
         priority={priority}
         unoptimized={false}
-        className="object-cover transition-transform duration-700 group-hover:scale-[1.03]"
+        className="press-photo object-cover transition-transform duration-700 group-hover:scale-[1.03]"
       />
     </div>
   );
@@ -115,15 +115,20 @@ export function LeadStory({ story }: { story: Story }) {
             {story.headline}
           </Link>
         </h2>
-        <p className="dropcap mt-4 max-w-column text-[1.0625rem] leading-[1.65] text-ink-soft">
-          {story.summary}
-        </p>
-        <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1">
-          {placeLabel(story) && (
-            <span className={`kicker ${story.locationSensitive ? 'text-ink-faint' : 'text-ink'}`}>
-              {placeLabel(story)}
-            </span>
-          )}
+        <div className="dropcap lead-columns mt-4 text-[1.0625rem] leading-[1.65] text-ink-soft">
+          <p>
+            {placeLabel(story) && (
+              <>
+                <span className={story.locationSensitive ? 'dateline text-ink-faint' : 'dateline'}>
+                  {placeLabel(story)}
+                </span>
+                <span className="text-ink-faint"> &mdash; </span>
+              </>
+            )}
+            {story.summary}
+          </p>
+        </div>
+        <div className="mt-4 border-t border-rule pt-2">
           <Provenance story={story} />
         </div>
       </div>
@@ -173,8 +178,9 @@ export function WireRow({ story }: { story: Story }) {
 
 export function DeskCard({ story }: { story: Story }) {
   return (
-    <article className="group flex h-full flex-col border border-rule bg-paper-card p-4 transition-shadow hover:shadow-lift">
+    <article className="group flex h-full flex-col border border-rule bg-paper-card p-4 transition-all hover:-translate-y-0.5 hover:shadow-lift">
       <DeskTag id={story.desk} className="text-[10px]" />
+      <span aria-hidden className="mt-2 block h-px w-full bg-rule" />
       <h3 className="mt-2 font-display text-[1.05rem] font-semibold leading-[1.22]">
         <Link href={`/story/${story.slug}`} className="headline-link">
           {story.headline}

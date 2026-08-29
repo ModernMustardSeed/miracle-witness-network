@@ -155,3 +155,148 @@
   color: #ffd23f;
   text-decoration-color: #ffd23f;
 }
+
+/* ==================================================================
+   Broadsheet devices
+   The things that make a page read as printed rather than rendered:
+   a nameplate that fills its measure, real rules, small caps, folio
+   lines, section ornaments, and photographs that look like they came
+   off a press.
+   ================================================================== */
+
+@layer components {
+  /* The nameplate. Sized to fill its column rather than to a fixed scale,
+     because a masthead that does not touch both margins is a logo, not a
+     nameplate. The tracking tightens as it grows, the way metal type was cut. */
+  /* The word is set to the measure, not to a scale.
+     In Fraunces at weight 900 with this tracking, "MIRACLE" renders 4.81x its
+     own font-size, measured. Dividing the available width by 5 therefore lands
+     it at about 96 per cent of the column at every width, with the remainder
+     absorbing a classic scrollbar. The cap stops it growing past the 1280px
+     page on a wide monitor. */
+  .nameplate {
+    font-family: var(--font-display), Georgia, serif;
+    font-weight: 900;
+    font-size: min(calc((100vw - 2.6rem) / 5), 15.5rem);
+    line-height: 0.78;
+    letter-spacing: -0.045em;
+    display: block;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  @media (min-width: 640px) {
+    .nameplate {
+      font-size: min(calc((100vw - 3.9rem) / 5), 15.5rem);
+      letter-spacing: -0.05em;
+    }
+  }
+
+  /* Ears: the little boxed notes either side of a nameplate. */
+  .ear {
+    font-family: var(--font-sans), system-ui, sans-serif;
+    font-size: 0.5625rem;
+    line-height: 1.45;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+
+  /* A thick rule over a hairline, the standard separator under a nameplate
+     and above a section head. */
+  .rule-press {
+    border-top: 4px solid var(--ink);
+    position: relative;
+  }
+
+  .rule-press::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 2px;
+    height: 1px;
+    background: var(--paper);
+  }
+
+  .rule-hair {
+    border-top: 1px solid var(--rule);
+  }
+
+  /* Section head: small caps between two rules, the way a paper labels a page. */
+  .section-head {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .section-head::before,
+  .section-head::after {
+    content: '';
+    height: 1px;
+    flex: 1;
+    background: var(--ink);
+    opacity: 0.85;
+  }
+
+  /* The dateline that opens a wire story: KATHMANDU — */
+  .dateline {
+    font-family: var(--font-sans), system-ui, sans-serif;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink);
+  }
+
+  /* Printer's ornament between sections. */
+  .dinkus {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    color: var(--ember);
+    font-size: 0.7rem;
+    letter-spacing: 0.5em;
+  }
+
+  /* The line at the foot of a page. */
+  .folio {
+    font-family: var(--font-sans), system-ui, sans-serif;
+    font-size: 0.625rem;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  /* Photographs, unified so a page of images from twenty outlets reads as one
+     print run rather than twenty websites. */
+  .press-photo {
+    filter: contrast(1.06) saturate(0.88) sepia(0.05);
+  }
+
+  /* The lead standfirst runs in columns on a wide screen, like a broadsheet. */
+  @media (min-width: 1024px) {
+    .lead-columns {
+      column-count: 2;
+      column-gap: 2.25rem;
+      column-rule: 1px solid var(--rule);
+    }
+  }
+
+  /* Small caps opening to a paragraph. */
+  .lead-in::first-line {
+    font-variant-caps: small-caps;
+    letter-spacing: 0.02em;
+  }
+
+  /* An index entry in the INSIDE strip. */
+  .index-entry {
+    font-family: var(--font-sans), system-ui, sans-serif;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+}

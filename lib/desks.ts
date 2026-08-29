@@ -15,6 +15,8 @@ export const DESK_IDS = [
   'justice',
   'renewal',
   'underground',
+  'discovery',
+  'courage',
 ] as const;
 
 export type DeskId = (typeof DESK_IDS)[number];
@@ -92,6 +94,24 @@ export const DESKS: Record<DeskId, Desk> = {
       'an exoneration or wrongful conviction overturned, a hostage or prisoner released, trafficking victims freed, a long-denied right restored, peace agreed',
     color: '#3B4A8C',
     tint: '#E5E8F4',
+  },
+  discovery: {
+    id: 'discovery',
+    name: 'Discovery',
+    brief: 'What we did not know last week. Science, space, and things dug up.',
+    signal:
+      'a scientific finding, an invention that works, a space mission that succeeded, an archaeological find, a lost text or artefact recovered, a species new to science, an engineering first',
+    color: '#1F5F70',
+    tint: '#E0EDF0',
+  },
+  courage: {
+    id: 'courage',
+    name: 'Courage',
+    brief: 'People who stood where standing cost something.',
+    signal:
+      'someone who risked themselves for another, a rescuer, a whistleblower vindicated, a person who refused to abandon a post, a stand taken at personal cost, a medal or citation for bravery',
+    color: '#8A3B12',
+    tint: '#F7E7DC',
   },
   underground: {
     id: 'underground',

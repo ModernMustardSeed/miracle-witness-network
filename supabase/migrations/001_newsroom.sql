@@ -12,7 +12,8 @@ create table if not exists public.stories (
   summary         text not null,
   desk            text not null check (desk in (
                     'rescue','revival','healing','provision','reunion',
-                    'kindness','justice','renewal','underground')),
+                    'kindness','justice','renewal','underground',
+                    'discovery','courage')),
   place           text,
   source_name     text not null,
   source_url      text not null,
@@ -54,7 +55,8 @@ create table if not exists public.submissions (
   place       text,
   desk        text check (desk in (
                 'rescue','revival','healing','provision','reunion',
-                'kindness','justice','renewal','underground')),
+                'kindness','justice','renewal','underground',
+                    'discovery','courage')),
   story       text not null,
   status      text not null default 'new' check (status in ('new','reviewing','published','declined')),
   created_at  timestamptz not null default now()
