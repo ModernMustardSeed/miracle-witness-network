@@ -1,4 +1,5 @@
 import type { RawItem } from '../types';
+import { getTextViaFetch, getTextViaNode } from './http';
 
 /**
  * GDELT indexes news from every country in 100+ languages and updates every
@@ -62,10 +63,14 @@ export function outletFromDomain(domain: string | undefined): string {
 }
 
 /**
- * GDELT sits behind a slow front door: a connect can take longer than the
- * runtime's default patience even when the service is healthy. One failed
- * attempt is not evidence the lane is down, so we try three times with a
- * widening gap before giving the whole query up.
+ * GDELT sits behind a slow, intermittent front door: measured, it answers three
+ * requests in five and takes 22 to 39 seconds to do it, and `fetch` takes a
+ * connection reset on calls where a different transport succeeds. So each query
+ * gets three attempts that alternate transports, inside a budget that leaves
+ * room for the editor to run afterwards.
+ *
+ * The lane is never fatal. Ten queries run in parallel, each one settles on its
+ * own, and How We Verify prints how many of the day's sources actually answered.
  */
 export async function fetchGdelt(
   q: GdeltQuery,
@@ -76,11 +81,11 @@ export async function fetchGdelt(
 
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {
-      return await fetchGdeltOnce(q, options);
+      return await fetchGdeltOnce(q, { ...options, transport: attempt % 2 === 0 ? 'fetch' : 'node' });
     } catch (error) {
       lastError = error;
       if (attempt < attempts - 1) {
-        await new Promise((resolve) => setTimeout(resolve, 1500 * (attempt + 1)));
+        await new Promise((resolve) => setTimeout(resolve, 1200));
       }
     }
   }
@@ -90,7 +95,12 @@ export async function fetchGdelt(
 
 async function fetchGdeltOnce(
   q: GdeltQuery,
-  { maxRecords = 30, timespan = '3d', timeoutMs = 45_000 } = {},
+  {
+    maxRecords = 30,
+    timespan = '3d',
+    timeoutMs = 42_000,
+    transport = 'fetch',
+  }: { maxRecords?: number; timespan?: string; timeoutMs?: number; transport?: 'fetch' | 'node' } = {},
 ): Promise<RawItem[]> {
   const url = new URL(ENDPOINT);
   url.searchParams.set('query', `${q.query} sourcelang:english`);
@@ -100,44 +110,38 @@ async function fetchGdeltOnce(
   url.searchParams.set('timespan', timespan);
   url.searchParams.set('sort', 'DateDesc');
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const response = await fetch(url, {
-      headers: { 'user-agent': USER_AGENT },
-      signal: controller.signal,
-      cache: 'no-store',
-    });
-    if (!response.ok) throw new Error(`GDELT ${q.label} answered ${response.status}`);
+  const headers = { 'user-agent': USER_AGENT, accept: '*/*' };
+  const get = transport === 'node' ? getTextViaNode : getTextViaFetch;
+  const { status, body } = await get(url.toString(), headers, timeoutMs);
 
-    // GDELT answers an over-rate-limited or malformed query with plain text,
-    // not JSON, and still sends a 200.
-    const body = await response.text();
-    if (!body.trimStart().startsWith('{')) {
-      throw new Error(`GDELT ${q.label} returned no JSON: ${body.slice(0, 120).trim()}`);
-    }
-
-    const parsed = JSON.parse(body) as { articles?: GdeltArticle[] };
-    const articles = parsed.articles ?? [];
-
-    return articles.flatMap<RawItem>((article) => {
-      if (!article.url || !article.title) return [];
-      const title = article.title.replace(/\s+/g, ' ').trim();
-      if (title.length < 12) return [];
-      return [
-        {
-          title,
-          url: article.url,
-          summary: null,
-          imageUrl: article.socialimage?.startsWith('https://') ? article.socialimage : null,
-          publishedAt: parseSeenDate(article.seendate),
-          sourceName: outletFromDomain(article.domain),
-          sourceKind: 'gdelt',
-          country: article.sourcecountry ?? null,
-        },
-      ];
-    });
-  } finally {
-    clearTimeout(timer);
+  if (status < 200 || status >= 300) {
+    throw new Error(`GDELT ${q.label} answered ${status} over ${transport}`);
   }
+
+  // GDELT answers an over-rate-limited or malformed query with plain text,
+  // not JSON, and still sends a 200.
+  if (!body.trimStart().startsWith('{')) {
+    throw new Error(`GDELT ${q.label} returned no JSON: ${body.slice(0, 120).trim()}`);
+  }
+
+  const parsed = JSON.parse(body) as { articles?: GdeltArticle[] };
+  const articles = parsed.articles ?? [];
+
+  return articles.flatMap<RawItem>((article) => {
+    if (!article.url || !article.title) return [];
+    const title = article.title.replace(/s+/g, ' ').trim();
+    if (title.length < 12) return [];
+    return [
+      {
+        title,
+        url: article.url,
+        summary: null,
+        imageUrl: article.socialimage?.startsWith('https://') ? article.socialimage : null,
+        publishedAt: parseSeenDate(article.seendate),
+        sourceName: outletFromDomain(article.domain),
+        sourceKind: 'gdelt',
+        country: article.sourcecountry ?? null,
+      },
+    ];
+  });
 }

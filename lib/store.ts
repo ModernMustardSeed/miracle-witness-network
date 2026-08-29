@@ -33,6 +33,8 @@ export interface Store {
   kind: 'supabase' | 'live';
   listStories(query?: StoryQuery): Promise<Story[]>;
   getStory(slug: string): Promise<Story | null>;
+  /** Which of these story ids the archive has already published. */
+  knownIds(ids: string[]): Promise<Set<string>>;
   saveStories(stories: Story[]): Promise<number>;
   saveRun(run: ScanRun): Promise<void>;
   lastRun(): Promise<ScanRun | null>;
@@ -96,6 +98,9 @@ interface LiveCache {
 
 const CACHE_MS = 15 * 60 * 1000;
 
+/** Without a database the archive lives in one instance's memory, so it is capped. */
+const LIVE_CAP = 300;
+
 const globalCache = globalThis as typeof globalThis & { __mwnCache?: LiveCache };
 const cache: LiveCache = (globalCache.__mwnCache ??= {
   stories: [],
@@ -111,12 +116,20 @@ async function hydrate(): Promise<void> {
 
   cache.inflight = (async () => {
     try {
-      const result = await runScan({ includeGdelt: false });
-      // A scan that comes back empty must not blank a page that already has
-      // stories on it; keep the last good edition instead.
-      if (result.stories.length > 0 || cache.stories.length === 0) {
-        cache.stories = result.stories;
-      }
+      const known = new Set(cache.stories.map((story) => story.id));
+      const result = await runScan({
+        includeGdelt: false,
+        // Without this the read path pays the editor to re-judge the same feed
+        // every fifteen minutes, which is both expensive and lets a headline
+        // drift between refreshes.
+        skipKnown: async (ids) => new Set(ids.filter((id) => known.has(id))),
+      });
+
+      // Merge rather than replace. A quiet pass that finds nothing new must not
+      // blank a page that already has an edition on it.
+      const merged = new Map(cache.stories.map((story) => [story.id, story]));
+      for (const story of result.stories) merged.set(story.id, story);
+      cache.stories = rank([...merged.values()]).slice(0, LIVE_CAP);
       cache.run = result.run;
       cache.at = Date.now();
     } finally {
@@ -136,6 +149,10 @@ const liveStore: Store = {
   async getStory(slug) {
     await hydrate();
     return cache.stories.find((story) => story.slug === slug) ?? null;
+  },
+  async knownIds(ids) {
+    const have = new Set(cache.stories.map((story) => story.id));
+    return new Set(ids.filter((id) => have.has(id)));
   },
   async saveStories(stories) {
     const byId = new Map(cache.stories.map((story) => [story.id, story]));
@@ -268,6 +285,20 @@ const supabaseStore: Store = {
     const { data, error } = await db().from('stories').select('*').eq('slug', slug).maybeSingle();
     if (error) throw new Error(`Reading that story failed: ${error.message}`);
     return data ? toStory(data as StoryRow) : null;
+  },
+
+  async knownIds(ids) {
+    if (ids.length === 0) return new Set<string>();
+    const found = new Set<string>();
+    // Chunked because a scan can ask about a few hundred ids at once and a
+    // single `in` list that long makes an unreasonable URL.
+    for (let i = 0; i < ids.length; i += 150) {
+      const chunk = ids.slice(i, i + 150);
+      const { data, error } = await db().from('stories').select('id').in('id', chunk);
+      if (error) throw new Error(`Checking the archive failed: ${error.message}`);
+      for (const row of data ?? []) found.add(String((row as { id: string }).id));
+    }
+    return found;
   },
 
   async saveStories(stories) {

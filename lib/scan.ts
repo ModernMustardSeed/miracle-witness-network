@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
 
 import { hasClaude, judge, runRules, type Judged } from './classify';
-import { cluster, rank } from './cluster';
+import { canonicalUrl, cluster, rank, storyId } from './cluster';
 import type { DeskId } from './desks';
 import { addMissingImages } from './enrich';
 import { screen, type Screened } from './filter';
-import { GDELT_QUERIES, fetchGdelt } from './sources/gdelt';
+import { GDELT_QUERIES, fetchGdelt, type GdeltQuery } from './sources/gdelt';
 import { FEEDS, fetchFeed } from './sources/rss';
 import type { RawItem, ScanRun, Story } from './types';
 
@@ -18,6 +18,13 @@ export interface ScanOptions {
   gdeltTimespan?: string;
   /** How many picture-less stories to go and find a social card for. */
   enrichImages?: number;
+  /** Size of the rotating GDELT window this pass runs. */
+  gdeltQueries?: number;
+  /**
+   * Asks the archive which candidates it already carries and drops them before
+   * the editor is paid to read them again.
+   */
+  skipKnown?: (ids: string[]) => Promise<Set<string>>;
 }
 
 export interface ScanResult {
@@ -34,23 +41,68 @@ interface Collected {
   warnings: string[];
 }
 
+/**
+ * GDELT throttles. Ten queries fired at once came back with one answer; the
+ * same queries run two at a time answer far more often, and the service is a
+ * free public good we would rather not hammer.
+ *
+ * So each pass takes a window of five queries and the window walks forward by
+ * the hour. Every query still runs several times a day, no pass spends more
+ * than about a minute in this lane, and the editor keeps the rest of the
+ * function's budget.
+ */
+export function gdeltWindow(hour: number, size = 5): GdeltQuery[] {
+  const total = GDELT_QUERIES.length;
+  const start = ((hour % total) + total) % total;
+  return Array.from({ length: Math.min(size, total) }, (_, i) => GDELT_QUERIES[(start + i) % total]!);
+}
+
+async function pool<T, R>(
+  items: T[],
+  concurrency: number,
+  work: (item: T) => Promise<R>,
+): Promise<PromiseSettledResult<R>[]> {
+  const results: PromiseSettledResult<R>[] = new Array(items.length);
+  let cursor = 0;
+
+  const runners = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+    while (cursor < items.length) {
+      const index = cursor++;
+      const item = items[index]!;
+      try {
+        results[index] = { status: 'fulfilled', value: await work(item) };
+      } catch (reason) {
+        results[index] = { status: 'rejected', reason };
+      }
+    }
+  });
+
+  await Promise.all(runners);
+  return results;
+}
+
 async function collect(options: Required<ScanOptions>): Promise<Collected> {
   const warnings: string[] = [];
   const alwaysPositive = new Set(
     FEEDS.filter((feed) => feed.alwaysPositive).map((feed) => feed.name),
   );
 
-  const feedJobs = FEEDS.map(async (feed) => fetchFeed(feed));
-  const gdeltJobs = options.includeGdelt
-    ? GDELT_QUERIES.map(async (query) => fetchGdelt(query, { timespan: options.gdeltTimespan }))
+  const queries = options.includeGdelt
+    ? gdeltWindow(new Date().getUTCHours(), options.gdeltQueries)
     : [];
 
   const labels = [
     ...FEEDS.map((feed) => feed.name),
-    ...(options.includeGdelt ? GDELT_QUERIES.map((query) => `GDELT ${query.label}`) : []),
+    ...queries.map((query) => `GDELT ${query.label}`),
   ];
 
-  const settled = await Promise.allSettled([...feedJobs, ...gdeltJobs]);
+  // The feeds are fast and independent, so they all go at once. GDELT goes two
+  // at a time or it answers nothing.
+  const [feedResults, gdeltResults] = await Promise.all([
+    Promise.allSettled(FEEDS.map(async (feed) => fetchFeed(feed))),
+    pool(queries, 2, (query) => fetchGdelt(query, { timespan: options.gdeltTimespan })),
+  ]);
+  const settled = [...feedResults, ...gdeltResults];
   const items: RawItem[] = [];
   let ok = 0;
   let failed = 0;
@@ -120,6 +172,8 @@ export async function runScan(options: ScanOptions = {}): Promise<ScanResult> {
     // The read path dresses only what lands above the fold, because a reader is
     // waiting on it. The hourly cron has time to dress the whole edition.
     enrichImages: options.enrichImages ?? (options.includeGdelt ? 30 : 8),
+    gdeltQueries: options.gdeltQueries ?? 5,
+    skipKnown: options.skipKnown ?? (async () => new Set<string>()),
   };
 
   const startedAt = new Date();
@@ -138,7 +192,28 @@ export async function runScan(options: ScanOptions = {}): Promise<ScanResult> {
     if (result) screened.push(result);
   }
 
-  const shortlist = shortlistByDesk(screened, 90);
+  // An hourly scan re-reads the same feeds, so most of what it collects is
+  // already published. Judging it again would cost real money every hour and
+  // would also let a story's headline drift between passes. Only what the
+  // archive has never seen reaches the editor.
+  let fresh = screened;
+  try {
+    const known = await resolved.skipKnown(
+      screened.map((entry) => storyId(canonicalUrl(entry.item.url))),
+    );
+    if (known.size > 0) {
+      fresh = screened.filter((entry) => !known.has(storyId(canonicalUrl(entry.item.url))));
+      warnings.push(`Skipped ${known.size} candidates the archive already carries.`);
+    }
+  } catch (error) {
+    warnings.push(
+      `Could not check the archive, so everything was judged: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
+
+  const shortlist = shortlistByDesk(fresh, 90);
 
   let judged: Judged[];
   if (resolved.useClaude) {

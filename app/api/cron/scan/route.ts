@@ -28,9 +28,13 @@ async function handle(request: Request) {
   const includeGdelt = url.searchParams.get('gdelt') !== 'off';
   const useClaude = url.searchParams.get('claude') !== 'off';
 
-  const started = Date.now();
-  const result = await runScan({ includeGdelt, useClaude });
   const active = store();
+  const started = Date.now();
+  const result = await runScan({
+    includeGdelt,
+    useClaude,
+    skipKnown: (ids) => active.knownIds(ids),
+  });
 
   let saved = 0;
   const problems: string[] = [...result.warnings];
